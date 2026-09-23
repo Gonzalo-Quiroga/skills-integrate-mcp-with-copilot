@@ -3,6 +3,25 @@ document.addEventListener("DOMContentLoaded", () => {
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
+  const loginForm = document.getElementById("login-form");
+  const logoutButton = document.getElementById("logout-button");
+  const authMessage = document.getElementById("auth-message");
+
+  function authHeaders() {
+    const token = localStorage.getItem("access_token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  function showAuthMessage(text, className) {
+    authMessage.textContent = text;
+    authMessage.className = className;
+  }
+
+  function updateAuthControls() {
+    const loggedIn = Boolean(localStorage.getItem("access_token"));
+    loginForm.classList.toggle("hidden", loggedIn);
+    logoutButton.classList.toggle("hidden", !loggedIn);
+  }
 
   // Function to fetch activities from API
   async function fetchActivities() {
@@ -80,6 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
         )}/unregister?email=${encodeURIComponent(email)}`,
         {
           method: "DELETE",
+          headers: authHeaders(),
         }
       );
 
@@ -94,6 +114,9 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
+        if (response.status === 401) {
+          showAuthMessage("Please log in as a teacher to manage participants.", "error");
+        }
       }
 
       messageDiv.classList.remove("hidden");
@@ -124,6 +147,7 @@ document.addEventListener("DOMContentLoaded", () => {
         )}/signup?email=${encodeURIComponent(email)}`,
         {
           method: "POST",
+          headers: authHeaders(),
         }
       );
 
@@ -139,6 +163,9 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
+        if (response.status === 401) {
+          showAuthMessage("Please log in as a teacher to manage participants.", "error");
+        }
       }
 
       messageDiv.classList.remove("hidden");
@@ -155,6 +182,34 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const response = await fetch("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: document.getElementById("username").value,
+        password: document.getElementById("password").value,
+      }),
+    });
+    const result = await response.json();
+    if (response.ok) {
+      localStorage.setItem("access_token", result.access_token);
+      loginForm.reset();
+      updateAuthControls();
+      showAuthMessage("Logged in successfully.", "success");
+    } else {
+      showAuthMessage(result.detail || "Unable to log in.", "error");
+    }
+  });
+
+  logoutButton.addEventListener("click", () => {
+    localStorage.removeItem("access_token");
+    updateAuthControls();
+    showAuthMessage("Logged out.", "info");
+  });
+
   // Initialize app
+  updateAuthControls();
   fetchActivities();
 });
